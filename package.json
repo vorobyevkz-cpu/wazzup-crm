@@ -1,0 +1,10 @@
+{
+  "name": "wazzup-bridge",
+  "scripts": {
+    "start": "node wazzup-bridge.js"
+  },
+  "dependencies": {
+    "express": "*",
+    "node-fetch": "2"
+  }
+}
