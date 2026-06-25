@@ -8,7 +8,7 @@
    • проксирует исходящие POST /send → Wazzup24 (чтобы ключ не светился в браузере).
 
   ── Запуск локально ──
-    npm init -y && npm i express node-fetch@2
+    npm init -y && npm i express node-fetch@2 nodemailer
     WAZZUP_KEY=9eeb5eff811640a580c078df55cc9c3a CRM_TOKEN=tt-secret node wazzup-bridge.js
     npx ngrok http 3003           # получите публичный https-адрес
 
@@ -53,6 +53,45 @@ app.put('/db', auth, (req, res) => {
   if (!data || !data.units) return res.status(400).json({ error: 'no data' });
   if ((v || 0) >= (crmStore.v || 0)) { crmStore = { v: v || Date.now(), data }; crmPersist(); }
   res.json({ ok: true, v: crmStore.v });
+});
+
+// ─── ПОЧТА: приглашения сотрудникам ───
+// Задайте в Render → Environment: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+let mailer = null;
+try {
+  const nodemailer = require('nodemailer');
+  if (process.env.SMTP_HOST) {
+    mailer = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 465),
+      secure: Number(process.env.SMTP_PORT || 465) === 465,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+  }
+} catch (e) { console.log('nodemailer не установлен — добавьте в зависимости'); }
+
+app.post('/invite', auth, async (req, res) => {
+  const { name, email, login, password, role, link, company } = req.body || {};
+  if (!email) return res.status(400).json({ ok: false, error: 'нет email' });
+  if (!mailer) return res.status(503).json({ ok: false, error: 'SMTP не настроен (задайте SMTP_* в Render)' });
+  const co = company || 'TT CITY';
+  const html = '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#1c1b18">' +
+    '<div style="background:#1c1b18;color:#fff;padding:22px 26px;border-radius:14px 14px 0 0;font-size:18px;font-weight:700">' + co + ' · CRM</div>' +
+    '<div style="border:1px solid #ece6db;border-top:none;border-radius:0 0 14px 14px;padding:24px 26px">' +
+    '<p>Здравствуйте, <b>' + (name || '') + '</b>!</p>' +
+    '<p>Вас пригласили в систему CRM ' + co + '. Данные для входа:</p>' +
+    '<div style="background:#faf6ec;border:1px solid #ecdcbb;border-radius:10px;padding:14px 16px;margin:14px 0">' +
+    'Логин: <b>' + (login || '') + '</b><br>Пароль: <b>' + (password || '') + '</b><br>Роль: ' + (role || '') + '</div>' +
+    (link ? '<a href="' + link + '" style="display:inline-block;background:#a9854c;color:#fff;text-decoration:none;padding:11px 22px;border-radius:100px;font-weight:700">Войти в CRM</a>' : '') +
+    '<p style="color:#8a8273;font-size:13px;margin-top:18px">После первого входа смените пароль в настройках.</p>' +
+    '</div></div>';
+  try {
+    await mailer.sendMail({
+      from: process.env.SMTP_FROM || ('CRM ' + co + ' <' + process.env.SMTP_USER + '>'),
+      to: email, subject: 'Приглашение в CRM ' + co, html,
+    });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
 // Хранилище сообщений в памяти (для продакшна замените на БД/файл)
