@@ -28,15 +28,31 @@ const PORT       = process.env.PORT || 3003;
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://wazzup-crm.onrender.com';
 
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '40mb' }));
 
 // CORS — чтобы CRM (другой домен) могла обращаться
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Content-Type, X-Token');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
   if (req.method === 'OPTIONS') return res.end();
   next();
+});
+
+// ─── ОБЩАЯ БАЗА CRM (один JSON для всех менеджеров) ───
+const fs = require('fs');
+const DB_FILE = 'crm-db.json';
+let crmStore = { v: 0, data: null };
+try { if (fs.existsSync(DB_FILE)) crmStore = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch (e) {}
+function crmPersist() { try { fs.writeFileSync(DB_FILE + '.tmp', JSON.stringify(crmStore)); fs.renameSync(DB_FILE + '.tmp', DB_FILE); } catch (e) {} }
+// отдать всю базу
+app.get('/db', auth, (_, res) => res.json(crmStore));
+// принять обновлённую базу (берём только более свежую версию)
+app.put('/db', auth, (req, res) => {
+  const { v, data } = req.body || {};
+  if (!data || !data.units) return res.status(400).json({ error: 'no data' });
+  if ((v || 0) >= (crmStore.v || 0)) { crmStore = { v: v || Date.now(), data }; crmPersist(); }
+  res.json({ ok: true, v: crmStore.v });
 });
 
 // Хранилище сообщений в памяти (для продакшна замените на БД/файл)
