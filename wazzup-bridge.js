@@ -91,7 +91,7 @@ app.post('/send-image', auth, async (req, res) => {
       body: JSON.stringify({ channelId: ch, chatType: 'whatsapp', chatId: String(phone).replace(/\D/g, ''), contentUri: publicUri, text: caption || '' }),
     });
     const j = await r.json().catch(() => ({}));
-    if (r.ok) { messages.push({ id: ++seq, phone, name: phone, from: 'out', text: caption || '[квартирный лист]', t: Date.now() }); res.json({ ok: true }); }
+    if (r.ok) { res.json({ ok: true }); }
     else res.status(400).json({ ok: false, error: j.error || ('код ' + r.status) });
   } catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
@@ -116,7 +116,7 @@ app.post('/send', auth, async (req, res) => {
       body: JSON.stringify({ channelId: ch, chatType: 'whatsapp', chatId: String(phone).replace(/\D/g, ''), text }),
     });
     const j = await r.json().catch(() => ({}));
-    if (r.ok) { messages.push({ id: ++seq, phone, name: phone, from: 'out', text, t: Date.now() }); res.json({ ok: true }); }
+    if (r.ok) { res.json({ ok: true }); }
     else res.status(400).json({ ok: false, error: j.error || ('код ' + r.status) });
   } catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
