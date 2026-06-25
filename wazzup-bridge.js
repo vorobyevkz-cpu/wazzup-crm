@@ -66,6 +66,7 @@ try {
       port: Number(process.env.SMTP_PORT || 465),
       secure: Number(process.env.SMTP_PORT || 465) === 465,
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      connectionTimeout: 12000, greetingTimeout: 12000, socketTimeout: 12000,
     });
   }
 } catch (e) { console.log('nodemailer не установлен — добавьте в зависимости'); }
@@ -90,8 +91,9 @@ app.post('/invite', auth, async (req, res) => {
       from: process.env.SMTP_FROM || ('CRM ' + co + ' <' + process.env.SMTP_USER + '>'),
       to: email, subject: 'Приглашение в CRM ' + co, html,
     });
+    console.log('INVITE OK →', email);
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+  } catch (e) { console.log('INVITE FAIL →', email, ':', String(e.message || e)); res.status(500).json({ ok: false, error: String(e.message || e) }); }
 });
 
 // Хранилище сообщений в памяти (для продакшна замените на БД/файл)
