@@ -85,14 +85,19 @@ app.post('/send-image', auth, async (req, res) => {
     const id = 'img_' + (++seq) + '_' + Date.now();
     imageStore[id] = imageBase64; // data:image/png;base64,....
     const publicUri = PUBLIC_URL.replace(/\/+$/, '') + '/img/' + id + '.png';
-    const r = await fetch('https://api.wazzup24.com/v3/message', {
+    const chatId = String(phone).replace(/\D/g, '');
+    const send = (payload) => fetch('https://api.wazzup24.com/v3/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + WAZZUP_KEY },
-      body: JSON.stringify({ channelId: ch, chatType: 'whatsapp', chatId: String(phone).replace(/\D/g, ''), contentUri: publicUri, text: caption || '' }),
+      body: JSON.stringify(Object.assign({ channelId: ch, chatType: 'whatsapp', chatId }, payload)),
     });
+    // 1) картинка БЕЗ текста (Wazzup не принимает contentUri + text вместе → INVALID_MESSAGE_DATA)
+    const r = await send({ contentUri: publicUri });
     const j = await r.json().catch(() => ({}));
-    if (r.ok) { res.json({ ok: true }); }
-    else res.status(400).json({ ok: false, error: j.error || ('код ' + r.status) });
+    if (!r.ok) return res.status(400).json({ ok: false, error: (j.error && (j.error.description || j.error)) || ('код ' + r.status) });
+    // 2) подпись отдельным сообщением
+    if (caption) { try { await send({ text: caption }); } catch (e) {} }
+    res.json({ ok: true });
   } catch (e) { res.status(500).json({ ok: false, error: String(e) }); }
 });
 
