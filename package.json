@@ -1,10 +1,11 @@
 {
   "name": "wazzup-bridge",
-  "scripts": {
-    "start": "node wazzup-bridge.js"
-  },
+  "version": "1.0.0",
+  "main": "wazzup-bridge.js",
+  "scripts": { "start": "node wazzup-bridge.js" },
   "dependencies": {
-    "express": "*",
-    "node-fetch": "2"
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0",
+    "nodemailer": "^6.9.8"
   }
 }
