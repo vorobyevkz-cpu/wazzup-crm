@@ -74,7 +74,6 @@ try {
 app.post('/invite', auth, async (req, res) => {
   const { name, email, login, password, role, link, company } = req.body || {};
   if (!email) return res.status(400).json({ ok: false, error: 'нет email' });
-  if (!mailer) return res.status(503).json({ ok: false, error: 'SMTP не настроен (задайте SMTP_* в Render)' });
   const co = company || 'TT CITY';
   const html = '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#1c1b18">' +
     '<div style="background:#1c1b18;color:#fff;padding:22px 26px;border-radius:14px 14px 0 0;font-size:18px;font-weight:700">' + co + ' · CRM</div>' +
@@ -87,6 +86,20 @@ app.post('/invite', auth, async (req, res) => {
     '<p style="color:#8a8273;font-size:13px;margin-top:18px">После первого входа смените пароль в настройках.</p>' +
     '</div></div>';
   try {
+    // 1) Resend HTTP API (порт 443 — Render не блокирует). Задайте RESEND_KEY в Render.
+    if (process.env.RESEND_KEY) {
+      const rr = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + process.env.RESEND_KEY },
+        body: JSON.stringify({ from: process.env.RESEND_FROM || 'CRM <onboarding@resend.dev>', to: [email], subject: 'Приглашение в CRM ' + co, html }),
+      });
+      const rj = await rr.json().catch(() => ({}));
+      if (rr.ok) { console.log('INVITE OK (resend) →', email); return res.json({ ok: true }); }
+      console.log('INVITE FAIL (resend) →', email, ':', JSON.stringify(rj));
+      return res.status(500).json({ ok: false, error: (rj && (rj.message || rj.name)) || ('resend код ' + rr.status) });
+    }
+    // 2) SMTP (если порт не заблокирован)
+    if (!mailer) return res.status(503).json({ ok: false, error: 'почта не настроена (RESEND_KEY или SMTP_*)' });
     await mailer.sendMail({
       from: process.env.SMTP_FROM || ('CRM ' + co + ' <' + process.env.SMTP_USER + '>'),
       to: email, subject: 'Приглашение в CRM ' + co, html,
